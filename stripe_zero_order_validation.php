@@ -760,6 +760,14 @@ add_hook('ShoppingCartCheckoutOutput', 1, function ($vars) {
                     skipInput.value = '1';
                     form.appendChild(skipInput);
 
+                    // CRITICAL: Set payment method to nopayment for zero-order
+                    // This prevents "The selected gateway is not available" error
+                    var paymentMethodInput = document.createElement('input');
+                    paymentMethodInput.type = 'hidden';
+                    paymentMethodInput.name = 'paymentmethod';
+                    paymentMethodInput.value = 'nopayment';
+                    form.appendChild(paymentMethodInput);
+
                     // Show success message
                     document.getElementById('stripe-zero-order-success').style.display = 'block';
                     document.getElementById('stripe-card-element').style.display = 'none';
@@ -945,12 +953,13 @@ add_hook('PreShoppingCartCheckout', 1, function ($vars) {
 add_hook('ClientAreaPageCart', 1, function ($vars) {
     // If we've already validated via SetupIntent, ensure WHMCS knows
     if (!empty($_POST['stripe_zero_order_validated']) && !empty($_POST['stripe_payment_method_id'])) {
-        // Do NOT set payment method - we handle card storage ourselves
-        // This prevents WHMCS from calling stripe_storeremote
-        unset($_POST['paymentmethod']);
+        // Set payment method to nopayment for zero-dollar orders
+        // This allows WHMCS to process the order without a payment gateway
+        // while we handle card storage ourselves via the AcceptOrder hook
+        $_POST['paymentmethod'] = 'nopayment';
         unset($_POST['ccinfo']);
 
-        logActivity("Stripe Zero Order: Intercepted cart processing, bypassing payment gateway. PM: " . $_POST['stripe_payment_method_id']);
+        logActivity("Stripe Zero Order: Intercepted cart processing, set paymentmethod to nopayment. PM: " . $_POST['stripe_payment_method_id']);
     }
 
     return $vars;
